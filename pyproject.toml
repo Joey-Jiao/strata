@@ -1,7 +1,7 @@
 [project]
 name = "strata"
 version = "0.1.0"
-description = ""
+description = "Runtime intelligence layer for personal infrastructure via MCP"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = []
