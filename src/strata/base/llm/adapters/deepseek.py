@@ -1,12 +1,10 @@
-from typing import List
-
 from .base import BaseAdapter
 from ..entity import LLMMessage, LLMUsage
 
 
 class DeepSeekAdapter(BaseAdapter):
     @classmethod
-    def to_chat_messages(cls, messages: List[LLMMessage]):
+    def to_chat_messages(cls, messages: list[LLMMessage]):
         """
         [{"role": "...", "content": "..."}]
         """

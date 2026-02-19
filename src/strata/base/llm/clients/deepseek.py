@@ -1,5 +1,4 @@
 import time
-from typing import List
 
 from openai import OpenAI
 
@@ -13,9 +12,9 @@ class DeepSeekClient(BaseClient):
         super().__init__()
         self.config = config
         self.adapter = DeepSeekAdapter
-        self.client = OpenAI(api_key=config.api_key, base_url=config.endpoint)
+        self.client = OpenAI(api_key=config.api_key, base_url=config.endpoint, timeout=config.timeout)
 
-    def chat(self, messages: List[LLMMessage]) -> LLMResponse:
+    def chat(self, messages: list[LLMMessage]) -> LLMResponse:
         chat_messages = self.adapter.to_chat_messages(messages)
 
         start = time.perf_counter()

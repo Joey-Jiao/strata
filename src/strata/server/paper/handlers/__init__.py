@@ -1,0 +1,4 @@
+from .locate import LOCATE_HANDLERS
+from .read import READ_HANDLERS
+
+HANDLERS = {**LOCATE_HANDLERS, **READ_HANDLERS}

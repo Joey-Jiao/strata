@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional, Union, Literal
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -8,14 +8,15 @@ RoleType = Literal["system", "user", "assistant", "tool", "developer"]
 class ClientConfig(BaseModel):
     provider: str = Field(..., description="provider name e.g, openai, deepseek")
     model: str = Field(..., description="model name, e.g., o4-mini-deep-research")
-    api_key: Optional[str] = Field(None, description="API key")
-    endpoint: Optional[str] = Field(None, description="base URL / host")
+    api_key: str | None = Field(None, description="API key")
+    endpoint: str | None = Field(None, description="base URL / host")
     timeout: int = Field(30, description="timeout in seconds")
+    max_tokens: int | None = Field(None, description="max output tokens")
 
 
 class LLMResponse(BaseModel):
     message: "LLMMessage"
-    usage: LLMUsage
+    usage: "LLMUsage"
     duration: float
 
 

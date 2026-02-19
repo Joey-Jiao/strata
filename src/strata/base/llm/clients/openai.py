@@ -1,5 +1,4 @@
 import time
-from typing import List
 
 from openai import OpenAI
 
@@ -12,9 +11,9 @@ class OpenAIClient(BaseClient):
     def __init__(self, config: ClientConfig):
         self.config = config
         self.adapter = OpenAIAdapter
-        self.client = OpenAI(api_key=config.api_key)
+        self.client = OpenAI(api_key=config.api_key, timeout=config.timeout)
 
-    def chat(self, messages: List[LLMMessage]) -> LLMResponse:
+    def chat(self, messages: list[LLMMessage]) -> LLMResponse:
         chat_messages = self.adapter.to_chat_messages(messages)
 
         start = time.perf_counter()
