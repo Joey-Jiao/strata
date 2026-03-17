@@ -3,9 +3,9 @@ import base64
 from mcp.types import TextContent, ImageContent
 
 from strata.base.configs import ConfigService
+from strata.modules.paper.common import create_store
 from strata.modules.paper.export import BibTeXExporter
 from strata.server.common import text, not_found
-from ..helpers import get_components
 
 
 def parse_page_range(pages_str: str, max_pages: int) -> list[int]:
@@ -28,7 +28,7 @@ def parse_page_range(pages_str: str, max_pages: int) -> list[int]:
 
 
 def handle_read(config: ConfigService, arguments: dict) -> list[TextContent | ImageContent]:
-    db, files, repo = get_components(config)
+    db, files, repo = create_store(config)
     try:
         key = arguments.get("key", "")
         mode = arguments.get("mode", "visual")
@@ -83,7 +83,7 @@ def handle_read(config: ConfigService, arguments: dict) -> list[TextContent | Im
 
 
 def handle_export(config: ConfigService, arguments: dict) -> list[TextContent]:
-    db, files, repo = get_components(config)
+    db, files, repo = create_store(config)
     try:
         keys = arguments.get("keys", [])
         tag = arguments.get("tag")

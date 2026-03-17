@@ -5,10 +5,9 @@ from pathlib import Path
 import typer
 
 from strata.base.configs import ConfigService
-from strata.modules.paper.sources.zotero import ZoteroReader, ZoteroStorageManager
-from strata.modules.paper.store import PaperDatabase, PaperRepository, PaperFiles
-from strata.modules.paper.sync import ZoteroSync, ZoteroWatcher
+from strata.modules.paper.common import create_store, create_syncer
 from strata.modules.paper.export import BibTeXExporter
+from strata.modules.paper.sync import ZoteroWatcher
 
 app = typer.Typer()
 
@@ -17,29 +16,11 @@ def get_config() -> ConfigService:
     return ConfigService()
 
 
-def get_components(config: ConfigService):
-    db_path = config.get("paper.store.database", "~/workspace/resource/paper/paper.sqlite")
-    files_dir = config.get("paper.store.files_dir", "~/workspace/resource/paper/files")
-    zotero_db = config.get("paper.sources.zotero.database", "~/workspace/resource/zotero/zotero.sqlite")
-    zotero_storage = config.get("paper.sources.zotero.storage_dir", "~/workspace/resource/zotero/storage")
-    stop_words = set(config.get("paper.citation.stop_words", []) or [])
-
-    db = PaperDatabase(db_path)
-    db.initialize(files_dir=files_dir)
-    files = PaperFiles(files_dir)
-    reader = ZoteroReader(zotero_db)
-    zotero_stor = ZoteroStorageManager(zotero_storage)
-    repo = PaperRepository(db)
-    syncer = ZoteroSync(reader, zotero_stor, db, files, stop_words)
-
-    return db, files, reader, zotero_stor, repo, syncer
-
-
 @app.command()
 def sync(deep: bool = typer.Option(False, "--deep", "-d", help="Deep sync: clear all and rebuild")):
     """Sync papers from Zotero to local store."""
     config = get_config()
-    db, files, reader, zotero_stor, repo, syncer = get_components(config)
+    db, files, repo, syncer = create_syncer(config)
 
     if deep:
         typer.echo("Deep syncing (clearing and rebuilding)...")
@@ -55,7 +36,7 @@ def sync(deep: bool = typer.Option(False, "--deep", "-d", help="Deep sync: clear
 def watch():
     """Watch Zotero for changes and sync automatically."""
     config = get_config()
-    db, files, reader, zotero_stor, repo, syncer = get_components(config)
+    db, files, repo, syncer = create_syncer(config)
     zotero_db = config.get("paper.sources.zotero.database")
 
     typer.echo("Initial sync...")
@@ -97,10 +78,10 @@ def list_papers(
 ):
     """List papers in local store."""
     config = get_config()
-    db, files, reader, zotero_stor, repo, syncer = get_components(config)
+    db, files, repo = create_store(config)
 
     if collection:
-        papers = repo.list_by_collection(collection)
+        papers, _ = repo.find(collection=collection, limit=limit)
     elif tag:
         papers, _ = repo.find(tag=tag, limit=limit)
     else:
@@ -118,7 +99,7 @@ def list_papers(
 def search(query: str):
     """Search papers by title, author, or abstract."""
     config = get_config()
-    db, files, reader, zotero_stor, repo, syncer = get_components(config)
+    db, files, repo = create_store(config)
 
     papers, total = repo.find(query=query)
     typer.echo(f"Found {total} papers:")
@@ -135,7 +116,7 @@ def export_cmd(
 ):
     """Export papers to BibTeX format."""
     config = get_config()
-    db, files, reader, zotero_stor, repo, syncer = get_components(config)
+    db, files, repo = create_store(config)
     exporter = BibTeXExporter()
 
     if all_papers:
@@ -161,7 +142,7 @@ def export_cmd(
 def info(key: str):
     """Show details of a paper."""
     config = get_config()
-    db, files, reader, zotero_stor, repo, syncer = get_components(config)
+    db, files, repo = create_store(config)
 
     paper = repo.get(key)
     if not paper:
@@ -194,22 +175,24 @@ def info(key: str):
 def collections():
     """List all collections."""
     config = get_config()
-    db, files, reader, zotero_stor, repo, syncer = get_components(config)
+    db, files, repo = create_store(config)
 
-    colls = repo.list_collections()
-    if not colls:
+    tree = repo.list_collections_tree()
+    if not tree:
         typer.echo("No collections found.")
         return
     typer.echo("Collections:")
-    for c in colls:
-        typer.echo(f"  {c}")
+    for c in tree:
+        depth = c["full_path"].count("/")
+        indent = "  " * depth
+        typer.echo(f"  {indent}{c['name']} ({c['paper_count']})")
 
 
 @app.command()
 def check():
     """Validate PDF/DB consistency and report anomalies."""
     config = get_config()
-    db, files, reader, zotero_stor, repo, syncer = get_components(config)
+    db, files, repo = create_store(config)
 
     all_papers = repo.list_all()
     db_keys = {p.citation_key for p in all_papers}

@@ -1,22 +1,10 @@
 from datetime import datetime, timezone
 
-from ..entities import Paper, Author
-from ..models import ZoteroItem
-from ..utils import extract_arxiv_id, normalize_venue
+from ..common import Paper, CitationKeyManager, ITEM_TYPE_MAP
+from ..sources.zotero.models import ZoteroItem, CollectionInfo
 from ..sources.zotero import ZoteroReader, ZoteroStorageManager
 from ..store import PaperDatabase, PaperRepository, PaperFiles
-from ..export import CitationKeyManager
-
-ZOTERO_TYPE_MAP = {
-    "journalArticle": "article",
-    "book": "book",
-    "bookSection": "incollection",
-    "conferencePaper": "inproceedings",
-    "thesis": "thesis",
-    "report": "techreport",
-    "preprint": "article",
-    "manuscript": "article",
-}
+from .transforms import extract_arxiv_id, normalize_venue
 
 
 class ZoteroSync:
@@ -39,15 +27,11 @@ class ZoteroSync:
         return datetime.now(timezone.utc).isoformat()
 
     def _convert_item(self, item: ZoteroItem, citation_key: str) -> Paper:
-        authors = [
-            Author(first_name=c.first_name, last_name=c.last_name, role=c.role)
-            for c in item.creators
-        ]
         return Paper(
             citation_key=citation_key,
-            item_type=ZOTERO_TYPE_MAP.get(item.item_type, "misc"),
+            item_type=ITEM_TYPE_MAP.get(item.item_type, "misc"),
             title=item.title,
-            authors=authors,
+            authors=item.creators,
             year=item.year,
             journal=item.journal,
             volume=item.volume,
@@ -74,15 +58,15 @@ class ZoteroSync:
 
     def _find_duplicate(self, paper: Paper) -> Paper | None:
         if paper.doi:
-            existing = self._repo.find_by_doi(paper.doi)
+            existing = self._repo.get_by_doi(paper.doi)
             if existing:
                 return existing
         if paper.arxiv_id:
-            existing = self._repo.find_by_arxiv_id(paper.arxiv_id)
+            existing = self._repo.get_by_arxiv_id(paper.arxiv_id)
             if existing:
                 return existing
         if paper.title and paper.first_author and paper.year:
-            existing = self._repo.find_by_title_author_year(
+            existing = self._repo.get_by_title_author_year(
                 paper.title, paper.first_author.last_name, paper.year
             )
             if existing:
@@ -92,8 +76,50 @@ class ZoteroSync:
     def _cascade_key(self, old_key: str, new_key: str):
         new_pdf = self._files.rename(old_key, new_key)
         self._repo.update_citation_key(old_key, new_key, new_pdf)
+        self._repo.update_paper_collection_key(old_key, new_key)
+
+    def _sync_collections(self):
+        zotero_colls = self._reader.list_collection_infos()
+        path_to_key = {c.full_path: c.source_key for c in zotero_colls}
+        sorted_colls = self._topo_sort_collections(zotero_colls)
+
+        coll_dicts = []
+        for coll in sorted_colls:
+            parent_path = coll.full_path.rsplit("/", 1)[0] if "/" in coll.full_path else None
+            parent_source_key = path_to_key.get(parent_path) if parent_path else None
+            coll_dicts.append({
+                "name": coll.name,
+                "parent_source_key": parent_source_key,
+                "full_path": coll.full_path,
+                "source_key": coll.source_key,
+            })
+
+        self._repo.sync_collections(coll_dicts)
+
+    def _topo_sort_collections(self, colls: list[CollectionInfo]) -> list[CollectionInfo]:
+        by_path = {c.full_path: c for c in colls}
+        visited: set[str] = set()
+        result: list[CollectionInfo] = []
+
+        def visit(c: CollectionInfo):
+            if c.full_path in visited:
+                return
+            parts = c.full_path.rsplit("/", 1)
+            if len(parts) == 2 and parts[0] in by_path:
+                visit(by_path[parts[0]])
+            visited.add(c.full_path)
+            result.append(c)
+
+        for c in colls:
+            visit(c)
+        return result
+
+    def _sync_paper_collections(self, item_key: str, citation_key: str):
+        coll_keys = self._reader.get_item_collection_keys(item_key)
+        self._repo.sync_paper_collections(citation_key, coll_keys)
 
     def sync(self) -> tuple[list[Paper], int]:
+        self._sync_collections()
         items = sorted(self._reader.list_items(), key=lambda i: i.key)
         zotero_keys = {item.key for item in items}
 
@@ -145,6 +171,7 @@ class ZoteroSync:
                 all_keys.add(target_key)
 
             results.append(self._repo.upsert(paper))
+            self._sync_paper_collections(item.key, paper.citation_key)
             self._repo.commit()
 
         self._repo.rebuild_fts()
@@ -158,20 +185,18 @@ class ZoteroSync:
             if folder not in db_keys:
                 self._files.delete(folder)
 
-        conn = self._repo._db.connection()
         for paper in self._repo.list_all():
             if paper.pdf_path and not self._files.exists(paper.citation_key):
-                conn.execute(
-                    "UPDATE papers SET pdf_path = NULL WHERE citation_key = ?",
-                    (paper.citation_key,),
-                )
-        conn.commit()
+                self._repo.clear_pdf_path(paper.citation_key)
+        self._repo.commit()
 
     def deep_sync(self) -> list[Paper]:
+        self._repo.clear_all_collections()
         self._repo.delete_all()
         self._repo.commit()
         self._files.delete_all()
 
+        self._sync_collections()
         items = sorted(self._reader.list_items(), key=lambda i: i.key)
         key_map = self._key_manager.generate_all(items)
         results = []
@@ -181,6 +206,7 @@ class ZoteroSync:
             paper.imported_at = self._now()
             paper.pdf_path = self._sync_pdf(item, citation_key)
             results.append(self._repo.insert(paper))
+            self._sync_paper_collections(item.key, citation_key)
         self._repo.commit()
         self._repo.rebuild_fts()
 

@@ -40,6 +40,10 @@ LOCATE_TOOLS = [
                     "type": "string",
                     "description": "Filter by tag",
                 },
+                "collection": {
+                    "type": "string",
+                    "description": "Filter by collection path (e.g., 'Projects' or 'Projects/GraphDP'). Includes papers in subcollections.",
+                },
                 "sort_by": {
                     "type": "string",
                     "enum": ["relevance", "year"],
@@ -86,8 +90,8 @@ LOCATE_TOOLS = [
             "properties": {
                 "type": {
                     "type": "string",
-                    "enum": ["tags", "stats"],
-                    "description": "What to browse: tags or stats (year distribution, PDF coverage, last sync)",
+                    "enum": ["tags", "stats", "collections"],
+                    "description": "What to browse: tags, stats (year distribution, PDF coverage, last sync), or collections (hierarchy tree with paper counts)",
                 },
             },
             "required": ["type"],

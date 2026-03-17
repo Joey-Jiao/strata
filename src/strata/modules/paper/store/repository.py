@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from ..entities import Paper, Author
+from ..common import Paper
 from .database import PaperDatabase
 
 
@@ -81,6 +81,7 @@ class PaperRepository:
         author: str | None = None,
         venue: str | None = None,
         tag: str | None = None,
+        collection: str | None = None,
         sort_by: str = "relevance",
         limit: int = 20,
         offset: int = 0,
@@ -115,13 +116,23 @@ class PaperRepository:
         if tag:
             conditions.append("EXISTS (SELECT 1 FROM json_each(p.source_tags) j WHERE j.value = ?)")
             params.append(tag)
+        if collection:
+            conditions.append("""EXISTS (
+                WITH RECURSIVE sub AS (
+                    SELECT id FROM collections WHERE full_path = ?
+                    UNION ALL
+                    SELECT c.id FROM collections c JOIN sub s ON c.parent_id = s.id
+                )
+                SELECT 1 FROM paper_collections pc
+                JOIN sub s ON pc.collection_id = s.id
+                WHERE pc.paper_key = p.citation_key
+            )""")
+            params.append(collection)
 
         where_clause = " AND ".join(conditions)
 
         if sort_by == "relevance" and use_fts:
             order = "ORDER BY papers_fts.rank"
-        elif sort_by == "year":
-            order = "ORDER BY p.year DESC, p.citation_key"
         else:
             order = "ORDER BY p.year DESC, p.citation_key"
 
@@ -134,7 +145,7 @@ class PaperRepository:
 
         return papers, total
 
-    def find_by_doi(self, doi: str) -> Paper | None:
+    def get_by_doi(self, doi: str) -> Paper | None:
         conn = self._db.connection()
         cursor = conn.execute(
             "SELECT * FROM papers WHERE doi = ? AND deleted_at IS NULL",
@@ -143,7 +154,7 @@ class PaperRepository:
         row = cursor.fetchone()
         return self._row_to_paper(dict(row)) if row else None
 
-    def find_by_arxiv_id(self, arxiv_id: str) -> Paper | None:
+    def get_by_arxiv_id(self, arxiv_id: str) -> Paper | None:
         conn = self._db.connection()
         cursor = conn.execute(
             "SELECT * FROM papers WHERE arxiv_id = ? AND deleted_at IS NULL",
@@ -152,7 +163,7 @@ class PaperRepository:
         row = cursor.fetchone()
         return self._row_to_paper(dict(row)) if row else None
 
-    def find_by_title_author_year(self, title: str, author_last: str, year: int) -> Paper | None:
+    def get_by_title_author_year(self, title: str, author_last: str, year: int) -> Paper | None:
         conn = self._db.connection()
         cursor = conn.execute(
             "SELECT * FROM papers WHERE title = ? AND authors LIKE ? AND year = ? AND deleted_at IS NULL",
@@ -293,27 +304,6 @@ class PaperRepository:
         )
         return {row[0] for row in cursor}
 
-    def list_by_collection(self, collection: str) -> list[Paper]:
-        conn = self._db.connection()
-        cursor = conn.execute(
-            """SELECT * FROM papers
-               WHERE EXISTS (SELECT 1 FROM json_each(source_collections) j WHERE j.value = ?)
-               AND deleted_at IS NULL
-               ORDER BY year DESC, citation_key""",
-            (collection,),
-        )
-        return [self._row_to_paper(dict(row)) for row in cursor]
-
-    def list_collections(self) -> list[str]:
-        conn = self._db.connection()
-        cursor = conn.execute(
-            "SELECT source_collections FROM papers WHERE source_collections IS NOT NULL AND deleted_at IS NULL"
-        )
-        all_collections: set[str] = set()
-        for row in cursor:
-            all_collections.update(Paper.parse_json_list(row["source_collections"]))
-        return sorted(all_collections)
-
     def list_tags(self) -> list[str]:
         conn = self._db.connection()
         cursor = conn.execute(
@@ -323,6 +313,18 @@ class PaperRepository:
         for row in cursor:
             all_tags.update(Paper.parse_json_list(row["source_tags"]))
         return sorted(all_tags)
+
+    def list_collections_tree(self) -> list[dict]:
+        conn = self._db.connection()
+        cursor = conn.execute("""
+            SELECT c.id, c.name, c.parent_id, c.full_path,
+                   COUNT(pc.paper_key) as paper_count
+            FROM collections c
+            LEFT JOIN paper_collections pc ON c.id = pc.collection_id
+            GROUP BY c.id
+            ORDER BY c.full_path
+        """)
+        return [dict(row) for row in cursor]
 
     def get_stats(self) -> dict:
         conn = self._db.connection()
@@ -353,6 +355,67 @@ class PaperRepository:
         conn = self._db.connection()
         conn.execute("INSERT INTO papers_fts(papers_fts) VALUES('rebuild')")
         conn.commit()
+
+    def sync_collections(self, sorted_colls: list[dict]):
+        conn = self._db.connection()
+        existing: dict[str, int] = {}
+        for row in conn.execute("SELECT id, source_key FROM collections"):
+            existing[row["source_key"]] = row["id"]
+
+        incoming_keys = {c["source_key"] for c in sorted_colls}
+        for key in set(existing) - incoming_keys:
+            conn.execute("DELETE FROM collections WHERE source_key = ?", (key,))
+
+        key_to_id: dict[str, int] = {}
+        for coll in sorted_colls:
+            parent_source_key = coll.get("parent_source_key")
+            parent_db_id = key_to_id.get(parent_source_key) if parent_source_key else None
+
+            if coll["source_key"] in existing:
+                conn.execute(
+                    "UPDATE collections SET name = ?, parent_id = ?, full_path = ? WHERE source_key = ?",
+                    (coll["name"], parent_db_id, coll["full_path"], coll["source_key"]),
+                )
+                key_to_id[coll["source_key"]] = existing[coll["source_key"]]
+            else:
+                cursor = conn.execute(
+                    "INSERT INTO collections (name, parent_id, full_path, source_key) VALUES (?, ?, ?, ?)",
+                    (coll["name"], parent_db_id, coll["full_path"], coll["source_key"]),
+                )
+                key_to_id[coll["source_key"]] = cursor.lastrowid
+        conn.commit()
+
+    def sync_paper_collections(self, paper_key: str, coll_source_keys: list[str]):
+        conn = self._db.connection()
+        conn.execute("DELETE FROM paper_collections WHERE paper_key = ?", (paper_key,))
+        for coll_key in coll_source_keys:
+            row = conn.execute(
+                "SELECT id FROM collections WHERE source_key = ?", (coll_key,)
+            ).fetchone()
+            if row:
+                conn.execute(
+                    "INSERT OR IGNORE INTO paper_collections (paper_key, collection_id) VALUES (?, ?)",
+                    (paper_key, row["id"]),
+                )
+
+    def update_paper_collection_key(self, old_key: str, new_key: str):
+        conn = self._db.connection()
+        conn.execute(
+            "UPDATE paper_collections SET paper_key = ? WHERE paper_key = ?",
+            (new_key, old_key),
+        )
+
+    def clear_pdf_path(self, citation_key: str):
+        conn = self._db.connection()
+        conn.execute(
+            "UPDATE papers SET pdf_path = NULL WHERE citation_key = ?",
+            (citation_key,),
+        )
+
+    def clear_all_collections(self):
+        conn = self._db.connection()
+        conn.execute("DELETE FROM paper_collections")
+        conn.execute("DELETE FROM collections")
 
     def delete_all(self) -> int:
         conn = self._db.connection()

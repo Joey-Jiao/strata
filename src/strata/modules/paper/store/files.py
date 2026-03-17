@@ -30,7 +30,7 @@ class PaperFiles:
             os.close(fd)
             shutil.copy2(source_path, tmp_path)
             os.rename(tmp_path, dest_path)
-        except:
+        except Exception:
             if os.path.exists(tmp_path):
                 os.unlink(tmp_path)
             raise

@@ -1,22 +1,8 @@
-from ..entities import Paper
-from ..models import ZoteroItem
-
-ITEM_TYPE_MAP = {
-    "journalArticle": "article",
-    "book": "book",
-    "bookSection": "incollection",
-    "conferencePaper": "inproceedings",
-    "thesis": "phdthesis",
-    "report": "techreport",
-    "webpage": "misc",
-    "preprint": "article",
-    "manuscript": "unpublished",
-}
+from ..common import Paper, ITEM_TYPE_MAP
+from ..sources.zotero.models import ZoteroItem
 
 
 class BibTeXExporter:
-    def __init__(self):
-        self._type_map = ITEM_TYPE_MAP.copy()
 
     def _escape(self, value: str) -> str:
         value = value.replace("\\", r"\\")
@@ -50,7 +36,7 @@ class BibTeXExporter:
         return "\n".join(entry_lines)
 
     def export_item(self, item: ZoteroItem) -> str:
-        entry_type = self._type_map.get(item.item_type, "misc")
+        entry_type = ITEM_TYPE_MAP.get(item.item_type, "misc")
         cite_key = item.citation_key or item.key
         authors = [c for c in item.creators if c.role == "author"]
         editors = [c for c in item.creators if c.role == "editor"]

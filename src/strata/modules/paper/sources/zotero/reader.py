@@ -2,7 +2,8 @@ import sqlite3
 from pathlib import Path
 from typing import Iterator
 
-from ...models import ZoteroItem, Creator, Attachment
+from ...common import Author
+from .models import ZoteroItem, Attachment, CollectionInfo
 
 
 class ZoteroReader:
@@ -30,7 +31,7 @@ class ZoteroReader:
         )
         return {row["fieldName"]: row["value"] for row in cursor}
 
-    def _get_creators(self, conn: sqlite3.Connection, item_id: int) -> list[Creator]:
+    def _get_creators(self, conn: sqlite3.Connection, item_id: int) -> list[Author]:
         cursor = conn.execute(
             """
             SELECT c.firstName, c.lastName, ct.creatorType
@@ -43,7 +44,7 @@ class ZoteroReader:
             (item_id,),
         )
         return [
-            Creator(
+            Author(
                 first_name=row["firstName"] or "",
                 last_name=row["lastName"] or "",
                 role=row["creatorType"],
@@ -77,21 +78,29 @@ class ZoteroReader:
             )
         return attachments
 
-    def _build_collection_paths(self, conn: sqlite3.Connection) -> dict[int, str]:
-        cursor = conn.execute("SELECT collectionID, collectionName, parentCollectionID FROM collections")
-        collections: dict[int, tuple[str, int | None]] = {}
+    def _build_collection_map(self, conn: sqlite3.Connection) -> dict[int, CollectionInfo]:
+        cursor = conn.execute("SELECT collectionID, collectionName, parentCollectionID, key FROM collections")
+        raw: dict[int, tuple[str, int | None, str]] = {}
         for row in cursor:
-            collections[row["collectionID"]] = (row["collectionName"], row["parentCollectionID"])
+            raw[row["collectionID"]] = (row["collectionName"], row["parentCollectionID"], row["key"])
 
         def get_path(coll_id: int) -> str:
-            name, parent_id = collections[coll_id]
+            name, parent_id, _ = raw[coll_id]
             if parent_id is None:
                 return name
             return f"{get_path(parent_id)}/{name}"
 
-        return {coll_id: get_path(coll_id) for coll_id in collections}
+        return {
+            coll_id: CollectionInfo(
+                name=name,
+                parent_id=parent_id,
+                full_path=get_path(coll_id),
+                source_key=key,
+            )
+            for coll_id, (name, parent_id, key) in raw.items()
+        }
 
-    def _get_collections(self, conn: sqlite3.Connection, item_id: int, collection_paths: dict[int, str]) -> list[str]:
+    def _get_collections(self, conn: sqlite3.Connection, item_id: int, collection_map: dict[int, CollectionInfo]) -> list[str]:
         cursor = conn.execute(
             """
             SELECT c.collectionID
@@ -101,7 +110,7 @@ class ZoteroReader:
             """,
             (item_id,),
         )
-        return [collection_paths[row["collectionID"]] for row in cursor if row["collectionID"] in collection_paths]
+        return [collection_map[row["collectionID"]].full_path for row in cursor if row["collectionID"] in collection_map]
 
     def _get_tags(self, conn: sqlite3.Connection, item_id: int) -> list[str]:
         cursor = conn.execute(
@@ -116,7 +125,7 @@ class ZoteroReader:
         return [row["name"] for row in cursor]
 
     def _build_item(
-        self, conn: sqlite3.Connection, item_id: int, key: str, item_type: str, collection_paths: dict[int, str]
+        self, conn: sqlite3.Connection, item_id: int, key: str, item_type: str, collection_map: dict[int, CollectionInfo]
     ) -> ZoteroItem:
         fields = self._get_item_fields(conn, item_id)
         return ZoteroItem(
@@ -136,7 +145,7 @@ class ZoteroReader:
             book_title=fields.get("bookTitle"),
             creators=self._get_creators(conn, item_id),
             attachments=self._get_attachments(conn, item_id),
-            collections=self._get_collections(conn, item_id, collection_paths),
+            collections=self._get_collections(conn, item_id, collection_map),
             tags=self._get_tags(conn, item_id),
         )
 
@@ -182,10 +191,10 @@ class ZoteroReader:
         tag: str | None = None,
     ) -> list[ZoteroItem]:
         with self._connect() as conn:
-            collection_paths = self._build_collection_paths(conn)
+            collection_map = self._build_collection_map(conn)
             items = []
             for item_id, key, item_type in self._iter_items(conn, collection, tag):
-                items.append(self._build_item(conn, item_id, key, item_type, collection_paths))
+                items.append(self._build_item(conn, item_id, key, item_type, collection_map))
             return items
 
     def get_item(self, item_id: int) -> ZoteroItem | None:
@@ -203,8 +212,8 @@ class ZoteroReader:
             row = cursor.fetchone()
             if not row:
                 return None
-            collection_paths = self._build_collection_paths(conn)
-            return self._build_item(conn, item_id, row["key"], row["typeName"], collection_paths)
+            collection_map = self._build_collection_map(conn)
+            return self._build_item(conn, item_id, row["key"], row["typeName"], collection_map)
 
     def get_item_by_key(self, key: str) -> ZoteroItem | None:
         with self._connect() as conn:
@@ -221,13 +230,13 @@ class ZoteroReader:
             row = cursor.fetchone()
             if not row:
                 return None
-            collection_paths = self._build_collection_paths(conn)
-            return self._build_item(conn, row["itemID"], key, row["typeName"], collection_paths)
+            collection_map = self._build_collection_map(conn)
+            return self._build_item(conn, row["itemID"], key, row["typeName"], collection_map)
 
     def search(self, query: str) -> list[ZoteroItem]:
         pattern = f"%{query}%"
         with self._connect() as conn:
-            collection_paths = self._build_collection_paths(conn)
+            collection_map = self._build_collection_map(conn)
             cursor = conn.execute(
                 """
                 SELECT DISTINCT i.itemID, i.key, it.typeName
@@ -251,8 +260,27 @@ class ZoteroReader:
             )
             items = []
             for row in cursor:
-                items.append(self._build_item(conn, row["itemID"], row["key"], row["typeName"], collection_paths))
+                items.append(self._build_item(conn, row["itemID"], row["key"], row["typeName"], collection_map))
             return items
+
+    def list_collection_infos(self) -> list[CollectionInfo]:
+        with self._connect() as conn:
+            return list(self._build_collection_map(conn).values())
+
+    def get_item_collection_keys(self, item_key: str) -> list[str]:
+        with self._connect() as conn:
+            cursor = conn.execute(
+                """
+                SELECT c.key
+                FROM collections c
+                JOIN collectionItems ci ON c.collectionID = ci.collectionID
+                JOIN items i ON ci.itemID = i.itemID
+                LEFT JOIN deletedItems di ON i.itemID = di.itemID
+                WHERE i.key = ? AND di.itemID IS NULL
+                """,
+                (item_key,),
+            )
+            return [row["key"] for row in cursor]
 
     def list_collections(self) -> list[str]:
         with self._connect() as conn:

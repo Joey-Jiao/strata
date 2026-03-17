@@ -1,6 +1,7 @@
 import punq
 
 from .configs import ConfigService
+from .db import MilvusService
 from .llm.service import LLMService
 
 
@@ -23,5 +24,8 @@ def get_context(config_dir: str = "configs", env_path: str = ".env") -> Applicat
 
     llm_service = LLMService(config=config_service)
     container.register(LLMService, instance=llm_service)
+
+    milvus_service = MilvusService(config=config_service)
+    container.register(MilvusService, instance=milvus_service)
 
     return ApplicationContext(container)

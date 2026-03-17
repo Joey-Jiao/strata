@@ -1,7 +1,7 @@
 import re
 import unicodedata
 
-from ..models import ZoteroItem
+from ..sources.zotero.models import ZoteroItem
 
 
 def _normalize(text: str) -> str:

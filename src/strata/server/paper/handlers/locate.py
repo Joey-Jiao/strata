@@ -1,8 +1,8 @@
 from mcp.types import TextContent
 
 from strata.base.configs import ConfigService
+from strata.modules.paper.common import create_store
 from strata.server.common import text, lines, not_found
-from ..helpers import get_components
 
 
 def _short_authors(paper) -> str:
@@ -17,7 +17,7 @@ def _short_authors(paper) -> str:
 
 
 def handle_find(config: ConfigService, arguments: dict) -> list[TextContent]:
-    db, files, repo = get_components(config)
+    db, files, repo = create_store(config)
     try:
         papers, total = repo.find(
             query=arguments.get("query"),
@@ -27,6 +27,7 @@ def handle_find(config: ConfigService, arguments: dict) -> list[TextContent]:
             author=arguments.get("author"),
             venue=arguments.get("venue"),
             tag=arguments.get("tag"),
+            collection=arguments.get("collection"),
             sort_by=arguments.get("sort_by", "relevance"),
             limit=arguments.get("limit", 20),
             offset=arguments.get("offset", 0),
@@ -55,7 +56,7 @@ def handle_find(config: ConfigService, arguments: dict) -> list[TextContent]:
 
 
 def handle_info(config: ConfigService, arguments: dict) -> list[TextContent]:
-    db, files, repo = get_components(config)
+    db, files, repo = create_store(config)
     try:
         key = arguments.get("key", "")
         paper = repo.get(key)
@@ -106,7 +107,7 @@ def handle_info(config: ConfigService, arguments: dict) -> list[TextContent]:
 
 
 def handle_browse(config: ConfigService, arguments: dict) -> list[TextContent]:
-    db, files, repo = get_components(config)
+    db, files, repo = create_store(config)
     try:
         browse_type = arguments.get("type", "tags")
 
@@ -115,6 +116,17 @@ def handle_browse(config: ConfigService, arguments: dict) -> list[TextContent]:
             if not items:
                 return text("No tags.")
             return text(f"Tags ({len(items)}):\n\n" + "\n".join(f"- {t}" for t in items))
+
+        elif browse_type == "collections":
+            tree = repo.list_collections_tree()
+            if not tree:
+                return text("No collections.")
+            items = []
+            for c in tree:
+                depth = c["full_path"].count("/")
+                indent = "  " * depth
+                items.append(f"{indent}- {c['name']} ({c['paper_count']})")
+            return text(f"Collections ({len(tree)}):\n\n" + "\n".join(items))
 
         elif browse_type == "stats":
             stats = repo.get_stats()
@@ -132,7 +144,7 @@ def handle_browse(config: ConfigService, arguments: dict) -> list[TextContent]:
             db_keys = repo.list_all_keys()
             folder_keys = set(files.list_folders())
             orphan_folders = folder_keys - db_keys
-            orphan_records = {k for p in repo.list_all() if p.pdf_path for k in [p.citation_key] if not files.exists(k)}
+            orphan_records = {p.citation_key for p in repo.list_all() if p.pdf_path and not files.exists(p.citation_key)}
             if orphan_folders or orphan_records:
                 parts.append("")
                 parts.append("Anomalies:")

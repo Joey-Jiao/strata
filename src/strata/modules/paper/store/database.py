@@ -11,13 +11,12 @@ class PaperDatabase:
     def _connect(self) -> sqlite3.Connection:
         conn = sqlite3.connect(self._db_path)
         conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA foreign_keys = ON")
         return conn
 
-    def initialize(self, files_dir: str | None = None):
-        from . import migration_001  # noqa: F401
-        from .migrations import run_migrations
-        conn = self.connection()
-        run_migrations(conn, {"files_dir": files_dir})
+    def initialize(self):
+        from .schema import initialize_schema
+        initialize_schema(self.connection())
 
     def connection(self) -> sqlite3.Connection:
         if self._conn is None:

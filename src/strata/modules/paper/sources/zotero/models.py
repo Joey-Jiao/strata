@@ -1,11 +1,14 @@
 import re
 from pydantic import BaseModel, Field, computed_field
 
+from ...common import Author
 
-class Creator(BaseModel):
-    first_name: str = ""
-    last_name: str = ""
-    role: str = "author"
+
+class CollectionInfo(BaseModel):
+    name: str
+    parent_id: int | None = None
+    full_path: str
+    source_key: str
 
 
 class Attachment(BaseModel):
@@ -19,7 +22,7 @@ class ZoteroItem(BaseModel):
     key: str
     item_type: str
     title: str = ""
-    creators: list[Creator] = Field(default_factory=list)
+    creators: list[Author] = Field(default_factory=list)
     date: str | None = None
     journal: str | None = None
     volume: str | None = None
@@ -44,6 +47,6 @@ class ZoteroItem(BaseModel):
         return int(match.group()) if match else None
 
     @property
-    def first_author(self) -> Creator | None:
+    def first_author(self) -> Author | None:
         authors = [c for c in self.creators if c.role == "author"]
         return authors[0] if authors else None

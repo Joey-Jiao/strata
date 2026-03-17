@@ -1,6 +1,18 @@
 import json
 from pydantic import BaseModel, Field, computed_field
 
+ITEM_TYPE_MAP = {
+    "journalArticle": "article",
+    "book": "book",
+    "bookSection": "incollection",
+    "conferencePaper": "inproceedings",
+    "thesis": "phdthesis",
+    "report": "techreport",
+    "webpage": "misc",
+    "preprint": "article",
+    "manuscript": "unpublished",
+}
+
 
 class Author(BaseModel):
     first_name: str = ""
