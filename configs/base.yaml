@@ -1,7 +1,2 @@
-embedding:
-  provider: openai
-  model: text-embedding-3-large
-  dimensions: 3072
-
 milvus:
-  uri: ~/workspace/resource/milvus/milvus.db
+  index_type: HNSW

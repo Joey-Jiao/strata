@@ -7,7 +7,7 @@ from ..configs import ConfigService
 
 class MilvusService:
     def __init__(self, config: ConfigService):
-        uri = config.get("base.milvus.uri", "./milvus.db")
+        uri = config.get("corpus.store.embedding", "~/workspace/resource/corpus/embedding.db")
         uri = str(Path(uri).expanduser())
         Path(uri).parent.mkdir(parents=True, exist_ok=True)
         self._client = MilvusClient(uri=uri)

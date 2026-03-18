@@ -1,0 +1,20 @@
+store:
+  database: ~/workspace/resource/corpus/main.sqlite
+  embedding: ~/workspace/resource/corpus/embedding.db
+  vectors: ~/workspace/resource/corpus/vectors.npz
+  cluster_model: ~/workspace/resource/corpus/cluster_model.pkl
+
+s2:
+  api_key:
+  timeout: 60
+  batch_size: 1000
+
+openalex:
+  api_key:
+  batch_size: 50
+  fuzzy_threshold: 0.85
+
+embedding:
+  model: text-embedding-3-large
+  dimensions: 3072
+  batch_size: 100

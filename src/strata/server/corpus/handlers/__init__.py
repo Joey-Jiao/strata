@@ -1,0 +1,5 @@
+from .locate import LOCATE_HANDLERS
+from .discover import DISCOVER_HANDLERS
+from .profile import PROFILE_HANDLERS
+
+HANDLERS = {**LOCATE_HANDLERS, **DISCOVER_HANDLERS, **PROFILE_HANDLERS}
