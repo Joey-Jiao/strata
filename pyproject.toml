@@ -19,6 +19,7 @@ dependencies = [
     "uvicorn>=0.30",
     "starlette>=0.40",
     "bertopic>=0.16",
+    "setuptools<70",
 ]
 
 [project.scripts]

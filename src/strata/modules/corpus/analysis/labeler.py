@@ -112,8 +112,6 @@ class ClusterLabeler:
         levels = sorted(set(c["level"] for c in clusters.values()), reverse=True)
 
         new_labels = {}
-        for cid, label in L0_LABELS.items():
-            new_labels[cid] = label
 
         for level in tqdm(levels, desc="Levels"):
             level_clusters = [c for c in clusters.values() if c["level"] == level and c["cluster_id"] not in new_labels]

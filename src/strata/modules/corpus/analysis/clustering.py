@@ -144,10 +144,7 @@ class ClusteringPipeline:
             cid = f"{parent_id}.{label}" if parent_id else str(label)
             kw = keywords.get(label, [])
 
-            if level == 0 and cid in L0_LABELS:
-                display_label = L0_LABELS[cid]
-            else:
-                display_label = "_".join(kw[:4])
+            display_label = "_".join(kw[:4])
 
             clusters[cid] = {
                 "parent_id": parent_id if parent_id else None,

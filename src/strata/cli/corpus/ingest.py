@@ -135,8 +135,13 @@ def ingest(
             _run_embed(config)
         elif only == "cluster":
             _run_cluster(config, retrain=retrain)
+        elif only == "label":
+            typer.echo("Generating cluster labels...")
+            labeler = create_cluster_labeler(config)
+            label_stats = labeler.run()
+            typer.echo(f"Labeled {label_stats['labeled']} clusters.")
         else:
-            typer.echo(f"Unknown step: {only}. Use: import, enrich, embed, cluster")
+            typer.echo(f"Unknown step: {only}. Use: import, enrich, embed, cluster, label")
             raise typer.Exit(1)
         return
 

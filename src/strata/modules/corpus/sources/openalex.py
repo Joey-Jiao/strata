@@ -159,7 +159,7 @@ class OpenAlexEnricher:
         arxiv = [p for p in pending if p["doi"] and "arxiv" in p["doi"].lower()]
         no_doi = [p for p in pending if not p["doi"]]
 
-        stats = {"tier1_doi_batch": 0, "tier2_doi_single": 0, "tier3_title_exact": 0, "tier4_title_fuzzy": 0, "unmatched": 0}
+        stats = {"tier1_doi_batch": 0, "tier2_doi_single": 0, "no_doi": len(no_doi), "unmatched": 0}
 
         if non_arxiv:
             pbar = tqdm(total=len(non_arxiv), desc="Tier 1: DOI batch")
@@ -175,51 +175,21 @@ class OpenAlexEnricher:
                 pbar.update(len(batch))
             pbar.close()
 
-        failed_doi_ids = set()
-        for p in non_arxiv:
-            row = conn.execute("SELECT openalex_id FROM papers WHERE paper_id = ?", (p["paper_id"],)).fetchone()
-            if not row[0]:
-                failed_doi_ids.add(p["paper_id"])
-
         if arxiv:
             for i, p in enumerate(tqdm(arxiv, desc="Tier 2: DOI single")):
                 work = self._fetch_doi_single(p["doi"])
                 self._write_enrichment(conn, p["paper_id"], work)
                 if work:
                     stats["tier2_doi_single"] += 1
-                else:
-                    failed_doi_ids.add(p["paper_id"])
                 if (i + 1) % 50 == 0:
                     conn.commit()
             conn.commit()
 
-        title_pending = [p for p in pending if p["paper_id"] in failed_doi_ids or not p["doi"]]
+        for p in no_doi:
+            self._write_enrichment(conn, p["paper_id"], None)
+        conn.commit()
 
-        exact_unmatched = []
-        if title_pending:
-            for i, p in enumerate(tqdm(title_pending, desc="Tier 3: Title exact")):
-                work = self._fetch_title(p["title"], p["year"], fuzzy=False)
-                if work:
-                    self._write_enrichment(conn, p["paper_id"], work)
-                    stats["tier3_title_exact"] += 1
-                else:
-                    exact_unmatched.append(p)
-                if (i + 1) % 50 == 0:
-                    conn.commit()
-            conn.commit()
-
-        if exact_unmatched:
-            for i, p in enumerate(tqdm(exact_unmatched, desc="Tier 4: Title fuzzy")):
-                work = self._fetch_title(p["title"], p["year"], fuzzy=True)
-                self._write_enrichment(conn, p["paper_id"], work)
-                if work:
-                    stats["tier4_title_fuzzy"] += 1
-                else:
-                    stats["unmatched"] += 1
-                if (i + 1) % 50 == 0:
-                    conn.commit()
-            conn.commit()
-
+        stats["unmatched"] = len(non_arxiv) + len(arxiv) - stats["tier1_doi_batch"] - stats["tier2_doi_single"]
         conn.close()
         stats["total"] = len(pending)
         return stats
