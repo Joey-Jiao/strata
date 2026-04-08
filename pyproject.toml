@@ -1,3 +1,7 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
 [project]
 name = "strata"
 version = "0.1.0"
@@ -20,6 +24,7 @@ dependencies = [
     "starlette>=0.40",
     "bertopic>=0.16",
     "setuptools<70",
+    "anthropic>=0.91.0",
 ]
 
 [project.scripts]

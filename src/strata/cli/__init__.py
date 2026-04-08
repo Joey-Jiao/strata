@@ -2,11 +2,13 @@ import typer
 
 from . import paper
 from . import corpus
+from . import profile
 
 app = typer.Typer(help="Strata - Personal knowledge management MCP server")
 
 app.add_typer(paper.app, name="paper", help="Paper/literature management")
 app.add_typer(corpus.app, name="corpus", help="Conference paper corpus management")
+app.add_typer(profile.app, name="profile", help="Personal profile and conventions")
 
 
 @app.command()
