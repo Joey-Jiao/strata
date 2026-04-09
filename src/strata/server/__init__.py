@@ -6,12 +6,12 @@ from mcp.types import TextContent
 from strata.base.configs import ConfigService
 from .paper import TOOLS as PAPER_TOOLS, HANDLERS as PAPER_HANDLERS
 from .corpus import TOOLS as CORPUS_TOOLS, HANDLERS as CORPUS_HANDLERS
-from .profile import TOOLS as PROFILE_TOOLS, HANDLERS as PROFILE_HANDLERS
+from .info import TOOLS as INFO_TOOLS, HANDLERS as INFO_HANDLERS
 
 server = Server("strata")
 
-ALL_TOOLS = PAPER_TOOLS + CORPUS_TOOLS + PROFILE_TOOLS
-ALL_HANDLERS = {**PAPER_HANDLERS, **CORPUS_HANDLERS, **PROFILE_HANDLERS}
+ALL_TOOLS = PAPER_TOOLS + CORPUS_TOOLS + INFO_TOOLS
+ALL_HANDLERS = {**PAPER_HANDLERS, **CORPUS_HANDLERS, **INFO_HANDLERS}
 
 _config: ConfigService | None = None
 

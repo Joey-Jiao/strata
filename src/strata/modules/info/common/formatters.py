@@ -1,11 +1,4 @@
-from mcp.types import TextContent
-
-from strata.base.configs import ConfigService
-from strata.modules.profile import ProfileReader
-from strata.server.common import text
-
-
-def _fmt_identity(data: dict) -> str:
+def fmt_identity(data: dict) -> str:
     parts = [f"Name: {data.get('name', '')}"]
     if data.get("alias"):
         parts.append(f"Alias: {data['alias']}")
@@ -18,7 +11,7 @@ def _fmt_identity(data: dict) -> str:
     return "\n".join(parts)
 
 
-def _fmt_workspace(data: dict) -> str:
+def fmt_workspace(data: dict) -> str:
     parts = [f"Root: {data.get('root', '')}"]
     for name, area in data.get("areas", {}).items():
         desc = area.get("description", "")
@@ -38,7 +31,7 @@ def _fmt_workspace(data: dict) -> str:
     return "\n".join(parts)
 
 
-def _fmt_hosts(data: dict) -> str:
+def fmt_hosts(data: dict) -> str:
     parts = []
     desc = data.get("description", "")
     if desc:
@@ -52,7 +45,7 @@ def _fmt_hosts(data: dict) -> str:
     return "\n".join(parts)
 
 
-def _fmt_conventions(data: dict) -> str:
+def fmt_conventions(data: dict) -> str:
     parts = []
     for key, value in data.items():
         if isinstance(value, str):
@@ -61,38 +54,37 @@ def _fmt_conventions(data: dict) -> str:
     return "\n\n".join(parts)
 
 
-def handle_context(config: ConfigService, arguments: dict) -> list[TextContent]:
-    reader = ProfileReader(config)
+def fmt_reading(data: dict) -> str:
     parts = []
 
-    about = reader.about()
+    about = data.get("about", "")
     if about:
         parts.append(about.strip())
 
-    identity = reader.identity()
-    if identity:
-        parts.append(f"## Identity\n{_fmt_identity(identity)}")
+    tools = data.get("tools", "")
+    if tools:
+        parts.append(f"## Tools\n{tools.strip()}")
 
-    workspace = reader.workspace()
-    if workspace:
-        parts.append(f"## Workspace\n{_fmt_workspace(workspace)}")
+    notes = data.get("notes", {})
+    if notes:
+        sections = []
+        for kind in ("single", "collection"):
+            info = notes.get(kind, {})
+            if not info:
+                continue
+            path = info.get("path", "")
+            desc = info.get("description", "").strip()
+            template = info.get("template", "").strip()
+            block = f"### {kind.title()} Paper Notes\n**Path**: `{path}`\n{desc}"
+            if template:
+                block += f"\n\n**Template**:\n```markdown\n{template}\n```"
+            sections.append(block)
+        if sections:
+            parts.append(f"## Notes\n" + "\n\n".join(sections))
 
-    hosts = reader.hosts()
-    if hosts:
-        parts.append(f"## Hosts\n{_fmt_hosts(hosts)}")
+    rules = data.get("rules", [])
+    if rules:
+        items = "\n".join(f"- {r}" for r in rules)
+        parts.append(f"## Rules\n{items}")
 
-    return text("\n\n".join(parts))
-
-
-def handle_conventions(config: ConfigService, arguments: dict) -> list[TextContent]:
-    reader = ProfileReader(config)
-    data = reader.conventions()
-    if not data:
-        return text("No conventions configured.")
-    return text(_fmt_conventions(data))
-
-
-QUERY_HANDLERS = {
-    "profile_context": handle_context,
-    "profile_conventions": handle_conventions,
-}
+    return "\n\n".join(parts)

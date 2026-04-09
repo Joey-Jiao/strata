@@ -1,7 +1,6 @@
 import typer
 
-from strata.modules.profile import ProfileReader
-from strata.server.profile.handlers.query import _fmt_conventions
+from strata.modules.info import InfoReader, fmt_conventions
 from . import app, get_config
 
 
@@ -9,11 +8,11 @@ from . import app, get_config
 def conventions():
     """Show coding conventions."""
     config = get_config()
-    reader = ProfileReader(config)
+    reader = InfoReader(config)
 
     data = reader.conventions()
     if not data:
         typer.echo("No conventions configured.")
         return
 
-    typer.echo(_fmt_conventions(data))
+    typer.echo(fmt_conventions(data))

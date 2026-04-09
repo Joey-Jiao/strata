@@ -1,3 +1,0 @@
-from .query import QUERY_HANDLERS
-
-HANDLERS = {**QUERY_HANDLERS}

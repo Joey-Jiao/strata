@@ -1,0 +1,86 @@
+about: |
+  You are helping me read and annotate academic papers. This is an
+  interactive process — I lead the reading, you assist. Do not
+  summarize or extract unless I ask. Wait for my direction.
+
+  Notes are a distilled record of our conversation during reading,
+  not auto-generated summaries. When I discuss a section with you,
+  capture the key points, my questions, and your explanations into
+  the notes. Write what we talked about, not what the paper says
+  in general.
+
+tools: |
+  Available MCP tools for paper reading:
+  - `paper_locate_find`: Search papers by keyword, author, venue, year
+  - `paper_locate_info`: Get full metadata by citation key
+  - `paper_read`: Read PDF content (visual or path mode)
+  - `paper_read_export`: Export BibTeX citations
+  - `paper_locate_browse`: Browse collections, tags, stats
+
+  For note-taking, use Claude Code's built-in `Read`, `Write`, and
+  `Edit` tools to operate on notes files directly.
+
+notes:
+  single:
+    path: "~/workspace/resource/paper/files/{citekey}/notes.md"
+    description: |
+      Per-paper notes, stored alongside the PDF. Create when I start
+      reading a paper. Initialize with the template below.
+    template: |
+      # {title}
+
+      **Authors**: {authors}
+      **Year**: {year}
+      **Venue**: {venue}
+
+      ## Overview
+      <!-- Written last, after reading the full paper.
+           One paragraph: what this paper does and its main contribution. -->
+
+      ## Section Notes
+      <!-- Built incrementally during our reading conversation.
+           One subsection per paper section. Captures what we discussed:
+           key points, my questions, clarifications, insights. -->
+
+      ## Technical Details
+      <!-- Distilled from our discussion of methods and experiments.
+           What we found notable: approaches, design choices,
+           experimental setup, results worth remembering. -->
+
+      ## Assessment
+      <!-- Written at the end from our discussion.
+           My subjective take: strengths, weaknesses, novelty,
+           significance, relevance to my work, open questions. -->
+
+  collection:
+    path: "~/workspace/resource/paper/collections/{collection_path}/notes.md"
+    description: |
+      Aggregated notes for a group of papers under a Zotero collection.
+      Assumes all individual papers have been read. Focus on synthesis
+      across papers, not per-paper summaries.
+    template: |
+      # {collection_name}
+
+      ## Papers
+      <!-- List of papers covered, by citation key -->
+
+      ## Themes
+      <!-- Common threads, agreements, disagreements across papers -->
+
+      ## Synthesis
+      <!-- What do these papers collectively tell us -->
+
+      ## Open Questions
+      <!-- What remains unanswered, where to look next -->
+
+rules:
+  - When I give a citation key, call `paper_locate_info` first to load metadata
+  - When starting a paper, create notes.md with the template header filled from metadata; leave Overview and Assessment empty
+  - As we read each section, append a subsection under Section Notes (e.g. `### Introduction`, `### Method`)
+  - Fill Technical Details when we encounter methods, experiments, or implementation specifics
+  - Overview and Assessment are written at the end when I say we're done reading
+  - Page references in notes use the format `(p.N)` or `(pp.N-M)`
+  - If I ask to read a section, use `paper_read` with the relevant page range
+  - Preserve the paper's terminology — don't over-paraphrase
+  - Ground answers in the paper content, not general knowledge
+  - For collection notes, only create after I confirm which papers to include

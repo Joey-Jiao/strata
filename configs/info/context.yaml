@@ -1,0 +1,64 @@
+about: |
+  Personal infrastructure for a researcher working at the intersection of
+  ML and science. Three infra tools (strata, tectonic, metro) support a
+  workflow spanning literature management, multi-host development, and
+  LLM-assisted thinking. Research projects live in project/, each with
+  its own data/ directory. Data sync across machines is handled by
+  tectonic, code by git, and knowledge by strata.
+
+identity:
+  name: Ao Jiao
+  alias: Joey Jiao
+  domain: joeyjiao.dev
+  education:
+    - degree: B.Eng
+      school: Southern University of Science and Technology (SUSTech)
+    - degree: M.S.
+      school: Case Western Reserve University
+
+workspace:
+  root: ~/workspace
+  areas:
+    infra:
+      description: Personal infrastructure tools
+      projects:
+        strata:
+          description: >
+            Manages personal knowledge and research resources. Handles
+            literature library (sync, search, export), academic paper
+            corpus (ingestion, analysis, semantic search), and personal
+            context (profile, workspace info). Exposes everything via MCP
+            so any AI tool can access it.
+        tectonic:
+          description: >
+            Manages the machine fleet. Responsible for software
+            installation, dotfile distribution, data synchronization
+            across hosts, and service lifecycle (start, stop, deploy).
+            Single CLI to provision or update any machine.
+        metro:
+          description: >
+            Personal LLM chat interface for exploratory thinking.
+            Organizes conversations as trees so sub-questions branch off
+            without losing the main thread. Local-first, no cloud dependency.
+    project:
+      description: Research projects
+    preprocessing:
+      description: Shared data preprocessing pipelines for research projects
+    course:
+      description: Courses repositories
+    resource:
+      description: Strata-managed data store (paper, corpus, zotero databases and files)
+    site:
+      description: Personal websites repositories
+
+hosts:
+  description: >
+    A fleet of macOS and Linux machines connected via Tailscale,
+    authenticated through 1Password SSH agent, and uniformly managed
+    by tectonic. Workspace data is synced across hosts via rsync.
+  machines:
+    blanc: Current primary development machine (macOS)
+    everest: Secondary workstation (macOS)
+    campbell: Always-on server running long-lived services including strata (macOS)
+    granite: Linux workstation
+    pioneer: University HPC cluster with restricted access (no root, module-based environment)
