@@ -6,12 +6,12 @@ from mcp.types import TextContent
 from strata.base.configs import ConfigService
 from .paper import TOOLS as PAPER_TOOLS, HANDLERS as PAPER_HANDLERS
 from .corpus import TOOLS as CORPUS_TOOLS, HANDLERS as CORPUS_HANDLERS
-from .info import TOOLS as INFO_TOOLS, HANDLERS as INFO_HANDLERS
+from .info import PROMPTS as INFO_PROMPTS, handle_prompt as handle_info_prompt
 
 server = Server("strata")
 
-ALL_TOOLS = PAPER_TOOLS + CORPUS_TOOLS + INFO_TOOLS
-ALL_HANDLERS = {**PAPER_HANDLERS, **CORPUS_HANDLERS, **INFO_HANDLERS}
+ALL_TOOLS = PAPER_TOOLS + CORPUS_TOOLS
+ALL_HANDLERS = {**PAPER_HANDLERS, **CORPUS_HANDLERS}
 
 _config: ConfigService | None = None
 
@@ -35,6 +35,17 @@ async def call_tool(name: str, arguments: dict):
         return [TextContent(type="text", text=f"Unknown tool: {name}")]
     config = get_config()
     return handler(config, arguments)
+
+
+@server.list_prompts()
+async def list_prompts():
+    return INFO_PROMPTS
+
+
+@server.get_prompt()
+async def get_prompt(name: str, arguments: dict[str, str] | None):
+    config = get_config()
+    return handle_info_prompt(config, name)
 
 
 async def run_stdio():

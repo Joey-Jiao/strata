@@ -59,8 +59,14 @@ corpus_semantic_search     Semantic similarity search (embedding ANN)
 corpus_similar             Find papers similar to a given paper
 corpus_authors             Search authors, view publication profiles
 corpus_institutions        View institution publication statistics
+```
 
-info_context               Personal context (identity, workspace, hosts)
-info_conventions           Coding conventions and design principles
-info_reading               Paper reading guide, note-taking format, and interaction rules
+## MCP Prompts
+
+User-invoked slash commands to load static guides into the conversation:
+
+```
+context                    Personal context (identity, workspace, hosts, infrastructure)
+code                       Coding conventions and design principles
+read                       Paper reading guide, note-taking format, and interaction rules
 ```

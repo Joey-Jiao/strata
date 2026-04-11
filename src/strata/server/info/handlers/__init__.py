@@ -1,3 +1,1 @@
-from .query import TOOL_HANDLERS
-
-HANDLERS = {**TOOL_HANDLERS}
+from .query import handle_prompt

@@ -1,2 +1,2 @@
-from .tools import TOOLS
-from .handlers import HANDLERS
+from .prompts import PROMPTS
+from .handlers import handle_prompt
