@@ -268,17 +268,27 @@ class PaperRepository:
         )
         return cursor.rowcount > 0
 
-    def update_citation_key(self, old_key: str, new_key: str, new_pdf_path: str | None = None):
+    def rename_citation_key(self, old_key: str, new_key: str, new_pdf_path: str | None = None):
         conn = self._db.connection()
-        conn.execute(
-            "UPDATE papers SET citation_key = ? WHERE citation_key = ?",
-            (new_key, old_key),
-        )
-        if new_pdf_path:
+        try:
+            conn.execute("BEGIN")
             conn.execute(
-                "UPDATE papers SET pdf_path = ? WHERE citation_key = ?",
-                (new_pdf_path, new_key),
+                "UPDATE papers SET citation_key = ? WHERE citation_key = ?",
+                (new_key, old_key),
             )
+            conn.execute(
+                "UPDATE paper_collections SET paper_key = ? WHERE paper_key = ?",
+                (new_key, old_key),
+            )
+            if new_pdf_path:
+                conn.execute(
+                    "UPDATE papers SET pdf_path = ? WHERE citation_key = ?",
+                    (new_pdf_path, new_key),
+                )
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
 
     def add_source_key(self, citation_key: str, source_key: str):
         paper = self.get(citation_key)
@@ -397,13 +407,6 @@ class PaperRepository:
                     "INSERT OR IGNORE INTO paper_collections (paper_key, collection_id) VALUES (?, ?)",
                     (paper_key, row["id"]),
                 )
-
-    def update_paper_collection_key(self, old_key: str, new_key: str):
-        conn = self._db.connection()
-        conn.execute(
-            "UPDATE paper_collections SET paper_key = ? WHERE paper_key = ?",
-            (new_key, old_key),
-        )
 
     def clear_pdf_path(self, citation_key: str):
         conn = self._db.connection()

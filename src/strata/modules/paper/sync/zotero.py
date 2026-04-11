@@ -75,8 +75,12 @@ class ZoteroSync:
 
     def _cascade_key(self, old_key: str, new_key: str):
         new_pdf = self._files.rename(old_key, new_key)
-        self._repo.update_citation_key(old_key, new_key, new_pdf)
-        self._repo.update_paper_collection_key(old_key, new_key)
+        try:
+            self._repo.rename_citation_key(old_key, new_key, new_pdf)
+        except Exception:
+            if new_pdf:
+                self._files.rename(new_key, old_key)
+            raise
 
     def _sync_collections(self):
         zotero_colls = self._reader.list_collection_infos()
