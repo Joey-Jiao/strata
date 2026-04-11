@@ -6,14 +6,41 @@ from dotenv import load_dotenv
 from yaml import safe_load
 
 
+def _package_root() -> Path:
+    # configs.py lives at <root>/src/strata/base/configs.py
+    return Path(__file__).resolve().parent.parent.parent.parent
+
+
+def _default_config_dir() -> Path:
+    env_dir = os.environ.get("STRATA_CONFIG_DIR")
+    if env_dir:
+        return Path(env_dir).expanduser()
+    return _package_root() / "configs"
+
+
+def _default_env_path() -> Path:
+    env_file = os.environ.get("STRATA_ENV_FILE")
+    if env_file:
+        return Path(env_file).expanduser()
+    return _package_root() / ".env"
+
+
 class ConfigService:
-    def __init__(self, config_dir: str | Path = "configs", env_path: str | Path | None = ".env"):
-        self._config_dir = Path(config_dir)
+    def __init__(
+        self,
+        config_dir: str | Path | None = None,
+        env_path: str | Path | None = None,
+    ):
+        self._config_dir = (
+            Path(config_dir).expanduser() if config_dir is not None else _default_config_dir()
+        )
         self._cache: dict[tuple[str, str], dict | None] = {}
         self._folders: set[str] = set()
         self._scan_config_tree()
-        if env_path:
-            load_dotenv(env_path, override=True)
+
+        env = Path(env_path).expanduser() if env_path is not None else _default_env_path()
+        if env.exists():
+            load_dotenv(env, override=True)
 
     def _scan_config_tree(self):
         if not self._config_dir.exists():
