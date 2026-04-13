@@ -6,9 +6,10 @@ from strata.modules.info import (
     fmt_identity,
     fmt_workspace,
     fmt_hosts,
-    fmt_conventions,
-    fmt_reading,
+    fmt_code,
+    fmt_read,
 )
+from strata.server.common import text
 
 
 def _render_context(reader: InfoReader) -> str:
@@ -28,19 +29,42 @@ def _render_context(reader: InfoReader) -> str:
     return "\n\n".join(parts)
 
 
-def _render_conventions(reader: InfoReader) -> str:
-    data = reader.conventions()
+def _render_code(reader: InfoReader) -> str:
+    data = reader.code()
     if not data:
-        return "No conventions configured."
-    return fmt_conventions(data)
+        return "No coding conventions configured."
+    return fmt_code(data)
 
 
-def _render_reading(reader: InfoReader) -> str:
-    data = reader.reading()
+def _render_read(reader: InfoReader) -> str:
+    data = reader.read()
     if not data:
         return "No reading config."
-    return fmt_reading(data)
+    return fmt_read(data)
 
+
+# Tool handlers
+
+def handle_context_tool(config: ConfigService, arguments: dict) -> list[TextContent]:
+    return text(_render_context(InfoReader(config)))
+
+
+def handle_code_tool(config: ConfigService, arguments: dict) -> list[TextContent]:
+    return text(_render_code(InfoReader(config)))
+
+
+def handle_read_tool(config: ConfigService, arguments: dict) -> list[TextContent]:
+    return text(_render_read(InfoReader(config)))
+
+
+TOOL_HANDLERS = {
+    "info_context": handle_context_tool,
+    "info_conventions": handle_code_tool,
+    "info_reading": handle_read_tool,
+}
+
+
+# Prompt handler
 
 def _prompt_result(description: str, content: str) -> GetPromptResult:
     return GetPromptResult(
@@ -66,13 +90,13 @@ def handle_prompt(config: ConfigService, name: str) -> GetPromptResult:
     if name == "code":
         return _prompt_result(
             "Coding conventions and design principles",
-            "Here are my coding conventions:\n\n" + _render_conventions(reader),
+            "Here are my coding conventions:\n\n" + _render_code(reader),
         )
 
     if name == "read":
         return _prompt_result(
             "Paper reading guide and note-taking format",
-            _render_reading(reader),
+            _render_read(reader),
         )
 
     return _prompt_result("Unknown prompt", f"Unknown prompt: {name}")

@@ -45,7 +45,7 @@ def fmt_hosts(data: dict) -> str:
     return "\n".join(parts)
 
 
-def fmt_conventions(data: dict) -> str:
+def fmt_code(data: dict) -> str:
     parts = []
     for key, value in data.items():
         if isinstance(value, str):
@@ -54,7 +54,7 @@ def fmt_conventions(data: dict) -> str:
     return "\n\n".join(parts)
 
 
-def fmt_reading(data: dict) -> str:
+def fmt_read(data: dict) -> str:
     parts = []
 
     about = data.get("about", "")

@@ -27,30 +27,43 @@ notes:
       Per-paper notes, stored alongside the PDF. Create when I start
       reading a paper. Initialize with the template below.
     template: |
+      For a standard research paper, use the following reference template.
+      Adapt section headings to match the actual paper structure.
+
       # {title}
 
-      **Authors**: {authors}
-      **Year**: {year}
-      **Venue**: {venue}
+      **Authors**:
+      **Year**: 
+      **Venue**:  
+      **Read**: 
 
       ## Overview
-      <!-- Written last, after reading the full paper.
-           One paragraph: what this paper does and its main contribution. -->
+      <!-- Written last. One paragraph: what this paper does,
+           its main contribution, and why it matters. -->
+
+      ## Introduction, Motivation, Related Works
+      <!-- What problem is being solved, why it matters,
+           how it fits into existing work. Captured from our
+           discussion of the intro and related work sections. -->
 
       ## Section Notes
-      <!-- Built incrementally during our reading conversation.
-           One subsection per paper section. Captures what we discussed:
-           key points, my questions, clarifications, insights. -->
+      <!-- Built incrementally as we read through the paper.
+           One subsection per major section or logical block.
+           Captures what we discussed: key points, my questions,
+           clarifications, insights. -->
+
+      ### {section name}
+      ...
 
       ## Technical Details
-      <!-- Distilled from our discussion of methods and experiments.
-           What we found notable: approaches, design choices,
-           experimental setup, results worth remembering. -->
+      <!-- Methods, algorithms, architectures, experimental setup.
+           Distilled from our discussion. Equations, hyperparameters,
+           datasets, baselines worth remembering. -->
 
       ## Assessment
-      <!-- Written at the end from our discussion.
-           My subjective take: strengths, weaknesses, novelty,
-           significance, relevance to my work, open questions. -->
+      <!-- Written at the end from our discussion. My subjective take:
+           strengths, weaknesses, novelty, significance,
+           relevance to my work, open questions. -->
 
   collection:
     path: "~/workspace/resource/paper/collections/{collection_path}/notes.md"
@@ -75,8 +88,9 @@ notes:
 
 rules:
   - When I give a citation key, call `paper_locate_info` first to load metadata
-  - When starting a paper, create notes.md with the template header filled from metadata; leave Overview and Assessment empty
-  - As we read each section, append a subsection under Section Notes (e.g. `### Introduction`, `### Method`)
+  - When starting a paper, create notes.md with the header filled from metadata; set Read date to today; leave Overview and Assessment empty
+  - Fill Introduction, Motivation, Related Works when we discuss early sections
+  - As we read each section, append a `###` subsection under Section Notes
   - Fill Technical Details when we encounter methods, experiments, or implementation specifics
   - Overview and Assessment are written at the end when I say we're done reading
   - Page references in notes use the format `(p.N)` or `(pp.N-M)`

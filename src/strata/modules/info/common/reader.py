@@ -17,8 +17,8 @@ class InfoReader:
     def hosts(self) -> dict:
         return self._config.get("info.context.hosts", {})
 
-    def conventions(self) -> dict:
-        return self._config.get("info.conventions", {})
+    def code(self) -> dict:
+        return self._config.get("info.code", {})
 
-    def reading(self) -> dict:
-        return self._config.get("info.reading", {})
+    def read(self) -> dict:
+        return self._config.get("info.read", {})
