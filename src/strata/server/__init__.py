@@ -69,7 +69,7 @@ async def run_http(host: str, port: int):
         app = Starlette(
             routes=[Mount("/mcp", app=session_manager.handle_request)],
         )
-        config = uvicorn.Config(app, host=host, port=port, reload=True)
+        config = uvicorn.Config(app, host=host, port=port)
         uvicorn_server = uvicorn.Server(config)
         await uvicorn_server.serve()
 
