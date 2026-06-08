@@ -43,7 +43,6 @@ class Paper(BaseModel):
     venue: str | None = None
     imported_at: str | None = None
     synced_at: str | None = None
-    deleted_at: str | None = None
 
     @computed_field
     @property

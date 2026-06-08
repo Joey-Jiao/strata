@@ -25,8 +25,7 @@ def initialize_schema(conn: sqlite3.Connection):
             arxiv_id           TEXT,
             venue              TEXT,
             imported_at        TEXT,
-            synced_at          TEXT,
-            deleted_at         TEXT
+            synced_at          TEXT
         );
 
         CREATE INDEX IF NOT EXISTS idx_papers_year ON papers(year);
@@ -57,3 +56,15 @@ def initialize_schema(conn: sqlite3.Connection):
 
         DROP TABLE IF EXISTS schema_version;
     """)
+
+
+def migrate(conn: sqlite3.Connection):
+    cols = {row["name"] for row in conn.execute("PRAGMA table_info(papers)").fetchall()}
+    if "deleted_at" not in cols:
+        return
+    conn.execute("DELETE FROM papers WHERE deleted_at IS NOT NULL")
+    conn.execute(
+        "DELETE FROM paper_collections WHERE paper_key NOT IN (SELECT citation_key FROM papers)"
+    )
+    conn.execute("ALTER TABLE papers DROP COLUMN deleted_at")
+    conn.commit()

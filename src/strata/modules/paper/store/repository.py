@@ -35,7 +35,6 @@ class PaperRepository:
             venue=row["venue"],
             imported_at=row["imported_at"],
             synced_at=row["synced_at"],
-            deleted_at=row["deleted_at"],
         )
 
     def begin(self):
@@ -50,7 +49,7 @@ class PaperRepository:
     def get(self, citation_key: str) -> Paper | None:
         conn = self._db.connection()
         cursor = conn.execute(
-            "SELECT * FROM papers WHERE citation_key = ? AND deleted_at IS NULL",
+            "SELECT * FROM papers WHERE citation_key = ?",
             (citation_key,),
         )
         row = cursor.fetchone()
@@ -59,7 +58,7 @@ class PaperRepository:
     def get_by_source_key(self, source_key: str) -> Paper | None:
         conn = self._db.connection()
         cursor = conn.execute(
-            "SELECT p.* FROM papers p, json_each(p.source_keys) j WHERE j.value = ? AND p.deleted_at IS NULL",
+            "SELECT p.* FROM papers p, json_each(p.source_keys) j WHERE j.value = ?",
             (source_key,),
         )
         row = cursor.fetchone()
@@ -68,7 +67,7 @@ class PaperRepository:
     def list_all(self) -> list[Paper]:
         conn = self._db.connection()
         cursor = conn.execute(
-            "SELECT * FROM papers WHERE deleted_at IS NULL ORDER BY year DESC, citation_key"
+            "SELECT * FROM papers ORDER BY year DESC, citation_key"
         )
         return [self._row_to_paper(dict(row)) for row in cursor]
 
@@ -87,7 +86,7 @@ class PaperRepository:
         offset: int = 0,
     ) -> tuple[list[Paper], int]:
         conn = self._db.connection()
-        conditions = ["p.deleted_at IS NULL"]
+        conditions: list[str] = []
         params: list = []
         use_fts = bool(query and query.strip())
 
@@ -129,17 +128,17 @@ class PaperRepository:
             )""")
             params.append(collection)
 
-        where_clause = " AND ".join(conditions)
+        where_clause = (" WHERE " + " AND ".join(conditions)) if conditions else ""
 
         if sort_by == "relevance" and use_fts:
             order = "ORDER BY papers_fts.rank"
         else:
             order = "ORDER BY p.year DESC, p.citation_key"
 
-        count_sql = f"SELECT COUNT(*) FROM {from_clause} WHERE {where_clause}"
+        count_sql = f"SELECT COUNT(*) FROM {from_clause}{where_clause}"
         total = conn.execute(count_sql, params).fetchone()[0]
 
-        select_sql = f"SELECT p.* FROM {from_clause} WHERE {where_clause} {order} LIMIT ? OFFSET ?"
+        select_sql = f"SELECT p.* FROM {from_clause}{where_clause} {order} LIMIT ? OFFSET ?"
         cursor = conn.execute(select_sql, params + [limit, offset])
         papers = [self._row_to_paper(dict(row)) for row in cursor]
 
@@ -148,7 +147,7 @@ class PaperRepository:
     def get_by_doi(self, doi: str) -> Paper | None:
         conn = self._db.connection()
         cursor = conn.execute(
-            "SELECT * FROM papers WHERE doi = ? AND deleted_at IS NULL",
+            "SELECT * FROM papers WHERE doi = ?",
             (doi,),
         )
         row = cursor.fetchone()
@@ -157,7 +156,7 @@ class PaperRepository:
     def get_by_arxiv_id(self, arxiv_id: str) -> Paper | None:
         conn = self._db.connection()
         cursor = conn.execute(
-            "SELECT * FROM papers WHERE arxiv_id = ? AND deleted_at IS NULL",
+            "SELECT * FROM papers WHERE arxiv_id = ?",
             (arxiv_id,),
         )
         row = cursor.fetchone()
@@ -166,7 +165,7 @@ class PaperRepository:
     def get_by_title_author_year(self, title: str, author_last: str, year: int) -> Paper | None:
         conn = self._db.connection()
         cursor = conn.execute(
-            "SELECT * FROM papers WHERE title = ? AND authors LIKE ? AND year = ? AND deleted_at IS NULL",
+            "SELECT * FROM papers WHERE title = ? AND authors LIKE ? AND year = ?",
             (title, f"%{author_last}%", year),
         )
         row = cursor.fetchone()
@@ -257,15 +256,8 @@ class PaperRepository:
 
     def delete(self, citation_key: str) -> bool:
         conn = self._db.connection()
+        conn.execute("DELETE FROM paper_collections WHERE paper_key = ?", (citation_key,))
         cursor = conn.execute("DELETE FROM papers WHERE citation_key = ?", (citation_key,))
-        return cursor.rowcount > 0
-
-    def soft_delete(self, citation_key: str) -> bool:
-        conn = self._db.connection()
-        cursor = conn.execute(
-            "UPDATE papers SET deleted_at = ? WHERE citation_key = ? AND deleted_at IS NULL",
-            (self._now(), citation_key),
-        )
         return cursor.rowcount > 0
 
     def rename_citation_key(self, old_key: str, new_key: str, new_pdf_path: str | None = None):
@@ -303,21 +295,19 @@ class PaperRepository:
     def list_source_keys(self) -> set[str]:
         conn = self._db.connection()
         cursor = conn.execute(
-            "SELECT j.value FROM papers p, json_each(p.source_keys) j WHERE p.deleted_at IS NULL"
+            "SELECT j.value FROM papers p, json_each(p.source_keys) j"
         )
         return {row[0] for row in cursor}
 
     def list_all_keys(self) -> set[str]:
         conn = self._db.connection()
-        cursor = conn.execute(
-            "SELECT citation_key FROM papers WHERE deleted_at IS NULL"
-        )
+        cursor = conn.execute("SELECT citation_key FROM papers")
         return {row[0] for row in cursor}
 
     def list_tags(self) -> list[str]:
         conn = self._db.connection()
         cursor = conn.execute(
-            "SELECT source_tags FROM papers WHERE source_tags IS NOT NULL AND deleted_at IS NULL"
+            "SELECT source_tags FROM papers WHERE source_tags IS NOT NULL"
         )
         all_tags: set[str] = set()
         for row in cursor:
@@ -338,18 +328,18 @@ class PaperRepository:
 
     def get_stats(self) -> dict:
         conn = self._db.connection()
-        total = conn.execute("SELECT COUNT(*) FROM papers WHERE deleted_at IS NULL").fetchone()[0]
+        total = conn.execute("SELECT COUNT(*) FROM papers").fetchone()[0]
         year_range = conn.execute(
-            "SELECT MIN(year), MAX(year) FROM papers WHERE deleted_at IS NULL"
+            "SELECT MIN(year), MAX(year) FROM papers"
         ).fetchone()
         by_year = conn.execute(
-            "SELECT year, COUNT(*) as cnt FROM papers WHERE year IS NOT NULL AND deleted_at IS NULL GROUP BY year ORDER BY year DESC"
+            "SELECT year, COUNT(*) as cnt FROM papers WHERE year IS NOT NULL GROUP BY year ORDER BY year DESC"
         ).fetchall()
         pdf_count = conn.execute(
-            "SELECT COUNT(*) FROM papers WHERE pdf_path IS NOT NULL AND deleted_at IS NULL"
+            "SELECT COUNT(*) FROM papers WHERE pdf_path IS NOT NULL"
         ).fetchone()[0]
         last_sync = conn.execute(
-            "SELECT MAX(synced_at) FROM papers WHERE deleted_at IS NULL"
+            "SELECT MAX(synced_at) FROM papers"
         ).fetchone()[0]
         return {
             "total": total,

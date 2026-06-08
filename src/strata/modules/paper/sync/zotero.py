@@ -136,7 +136,7 @@ class ZoteroSync:
                 continue
             remaining = [k for k in paper.source_keys if k in zotero_keys]
             if not remaining:
-                self._repo.soft_delete(paper.citation_key)
+                self._repo.delete(paper.citation_key)
                 self._repo.commit()
                 deleted_count += 1
 

@@ -15,8 +15,10 @@ class PaperDatabase:
         return conn
 
     def initialize(self):
-        from .schema import initialize_schema
-        initialize_schema(self.connection())
+        from .schema import initialize_schema, migrate
+        conn = self.connection()
+        initialize_schema(conn)
+        migrate(conn)
 
     def connection(self) -> sqlite3.Connection:
         if self._conn is None:
