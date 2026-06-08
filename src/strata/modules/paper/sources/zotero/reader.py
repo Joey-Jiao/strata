@@ -79,7 +79,12 @@ class ZoteroReader:
         return attachments
 
     def _build_collection_map(self, conn: sqlite3.Connection) -> dict[int, CollectionInfo]:
-        cursor = conn.execute("SELECT collectionID, collectionName, parentCollectionID, key FROM collections")
+        cursor = conn.execute("""
+            SELECT c.collectionID, c.collectionName, c.parentCollectionID, c.key
+            FROM collections c
+            LEFT JOIN deletedCollections dc ON c.collectionID = dc.collectionID
+            WHERE dc.collectionID IS NULL
+        """)
         raw: dict[int, tuple[str, int | None, str]] = {}
         for row in cursor:
             raw[row["collectionID"]] = (row["collectionName"], row["parentCollectionID"], row["key"])
