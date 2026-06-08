@@ -58,6 +58,18 @@ LOCATE_TOOLS = [
                     "enum": ["venues", "stats", "clusters"],
                     "description": "What to browse: venues (paper counts and year ranges), stats (totals, year distribution), or clusters (topic hierarchy with keywords)",
                 },
+                "parent": {
+                    "type": "string",
+                    "description": "For type=clusters only. Drill into children of this cluster_id. Omit to list top-level topics.",
+                },
+                "limit": {
+                    "type": "integer",
+                    "description": "For type=clusters only. Max children to return (default: 30)",
+                },
+                "offset": {
+                    "type": "integer",
+                    "description": "For type=clusters only. Pagination offset (default: 0)",
+                },
             },
             "required": ["type"],
         },

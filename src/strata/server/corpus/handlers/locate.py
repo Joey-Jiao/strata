@@ -71,21 +71,54 @@ def handle_browse(config: ConfigService, arguments: dict) -> list[TextContent]:
         elif browse_type == "clusters":
             import json
             conn = db.connection()
+            parent = arguments.get("parent")
+            limit = arguments.get("limit", 30)
+            offset = arguments.get("offset", 0)
+
             try:
-                clusters = conn.execute(
-                    "SELECT cluster_id, parent_id, level, label, keywords, paper_count FROM clusters ORDER BY level, paper_count DESC"
+                if parent is None:
+                    where_sql = "parent_id IS NULL"
+                    params: list = []
+                else:
+                    where_sql = "parent_id = ?"
+                    params = [parent]
+
+                total_row = conn.execute(
+                    f"SELECT COUNT(*) AS n FROM clusters WHERE {where_sql}", params
+                ).fetchone()
+                total = total_row["n"] if total_row else 0
+
+                rows = conn.execute(
+                    f"SELECT cluster_id, label, keywords, paper_count "
+                    f"FROM clusters WHERE {where_sql} "
+                    f"ORDER BY paper_count DESC LIMIT ? OFFSET ?",
+                    [*params, limit, offset],
                 ).fetchall()
             except Exception:
                 return text("No clusters available. Run 'strata corpus ingest --only cluster' first.")
-            if not clusters:
-                return text("No clusters found.")
+
+            if total == 0:
+                if parent is None:
+                    return text("No clusters found.")
+                return text(f"Cluster '{parent}' has no children.")
+
+            if parent is None:
+                header = f"Top-level topics (showing {offset + 1}-{offset + len(rows)} of {total})"
+            else:
+                parent_row = conn.execute(
+                    "SELECT label, paper_count FROM clusters WHERE cluster_id = ?", [parent]
+                ).fetchone()
+                ctx = f"[{parent}] {parent_row['label']} ({parent_row['paper_count']})" if parent_row else f"[{parent}]"
+                header = f"Children of {ctx} (showing {offset + 1}-{offset + len(rows)} of {total})"
+
             items = []
-            for c in clusters:
-                indent = "  " * c["level"]
+            for c in rows:
                 kw = json.loads(c["keywords"]) if c["keywords"] else []
                 kw_str = ", ".join(kw[:5])
-                items.append(f"{indent}[{c['cluster_id']}] {c['label']} ({c['paper_count']})\n{indent}  {kw_str}")
-            return text(f"Topic hierarchy ({len(clusters)} clusters):\n\n" + "\n".join(items))
+                items.append(f"[{c['cluster_id']}] {c['label']} ({c['paper_count']})\n  {kw_str}")
+
+            footer = "\n\nDrill in: pass parent=<cluster_id>. Paginate: limit / offset."
+            return text(header + "\n\n" + "\n".join(items) + footer)
 
         else:
             return text(f"Unknown browse type: {browse_type}")
