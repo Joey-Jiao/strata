@@ -10,7 +10,6 @@ def get_config() -> ConfigService:
 
 
 from .sync import sync
-from .watch import watch
 from .list import list_papers
 from .search import search
 from .info import info

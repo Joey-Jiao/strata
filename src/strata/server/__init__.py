@@ -1,9 +1,13 @@
 import asyncio
+import threading
+from pathlib import Path
+
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
 from mcp.types import TextContent
 
 from strata.base.configs import ConfigService
+from strata.modules.paper.common import create_syncer
 from .paper import TOOLS as PAPER_TOOLS, HANDLERS as PAPER_HANDLERS
 from .corpus import TOOLS as CORPUS_TOOLS, HANDLERS as CORPUS_HANDLERS
 from .info import PROMPTS as INFO_PROMPTS, handle_prompt as handle_info_prompt
@@ -23,6 +27,42 @@ def get_config() -> ConfigService:
     return _config
 
 
+_paper_guard = {
+    "syncer": None,
+    "zotero_db": None,
+    "mtime": 0.0,
+    "lock": threading.Lock(),
+}
+
+
+def _ensure_paper_fresh(config: ConfigService) -> None:
+    if _paper_guard["syncer"] is None:
+        _, _, _, syncer = create_syncer(config)
+        zotero_db = config.get("paper.sources.zotero.database")
+        if not zotero_db:
+            return
+        _paper_guard["syncer"] = syncer
+        _paper_guard["zotero_db"] = Path(zotero_db).expanduser()
+
+    zdb = _paper_guard["zotero_db"]
+    if zdb is None or not zdb.exists():
+        return
+
+    wal = Path(str(zdb) + "-wal")
+    mtime = zdb.stat().st_mtime
+    if wal.exists():
+        mtime = max(mtime, wal.stat().st_mtime)
+
+    if mtime <= _paper_guard["mtime"]:
+        return
+
+    with _paper_guard["lock"]:
+        if mtime <= _paper_guard["mtime"]:
+            return
+        _paper_guard["syncer"].sync()
+        _paper_guard["mtime"] = mtime
+
+
 @server.list_tools()
 async def list_tools():
     return ALL_TOOLS
@@ -34,6 +74,8 @@ async def call_tool(name: str, arguments: dict):
     if not handler:
         return [TextContent(type="text", text=f"Unknown tool: {name}")]
     config = get_config()
+    if name.startswith("paper_"):
+        _ensure_paper_fresh(config)
     return handler(config, arguments)
 
 
@@ -57,25 +99,5 @@ async def run_stdio():
         )
 
 
-async def run_http(host: str, port: int):
-    from starlette.applications import Starlette
-    from starlette.routing import Mount
-    from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
-    import uvicorn
-
-    session_manager = StreamableHTTPSessionManager(app=server)
-
-    async with session_manager.run():
-        app = Starlette(
-            routes=[Mount("/mcp", app=session_manager.handle_request)],
-        )
-        config = uvicorn.Config(app, host=host, port=port)
-        uvicorn_server = uvicorn.Server(config)
-        await uvicorn_server.serve()
-
-
-def main(transport: str = "stdio", host: str = "0.0.0.0", port: int = 8716):
-    if transport == "http":
-        asyncio.run(run_http(host, port))
-    else:
-        asyncio.run(run_stdio())
+def main():
+    asyncio.run(run_stdio())

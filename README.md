@@ -6,10 +6,7 @@ Personal knowledge and resource management platform via MCP Server.
 
 ```
 strata
-├── serve                            Start MCP server
-│   ├── [-t, --transport <type>]     Transport: stdio (default) or http
-│   ├── [--host <addr>]              HTTP bind address (default: 0.0.0.0)
-│   └── [-p, --port <port>]         HTTP port (default: 8716)
+├── serve                            Start MCP server (stdio)
 │
 ├── paper                            Paper/literature management (Zotero-synced)
 │   ├── sync                        Sync papers from Zotero
@@ -41,7 +38,7 @@ strata
 │
 └── info                             Static information and conventions
     ├── context                      Show personal context (identity, workspace, hosts)
-    └── conventions                  Show coding conventions
+    └── code                         Show coding conventions
 ```
 
 ## MCP Tools

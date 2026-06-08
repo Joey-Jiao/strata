@@ -12,14 +12,10 @@ app.add_typer(info.app, name="info", help="Static information and conventions")
 
 
 @app.command()
-def serve(
-    transport: str = typer.Option("stdio", "--transport", "-t", help="Transport: stdio or http"),
-    host: str = typer.Option("0.0.0.0", "--host", help="HTTP bind address"),
-    port: int = typer.Option(8716, "--port", "-p", help="HTTP port"),
-):
-    """Start MCP server."""
+def serve():
+    """Start MCP server (stdio)."""
     from strata.server import main
-    main(transport=transport, host=host, port=port)
+    main()
 
 
 if __name__ == "__main__":

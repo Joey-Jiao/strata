@@ -59,6 +59,6 @@ hosts:
   machines:
     blanc: Current primary development machine (macOS)
     everest: Secondary workstation (macOS)
-    campbell: Always-on server running long-lived services including strata (macOS)
+    campbell: Always-on server (macOS)
     granite: Linux workstation
     pioneer: University HPC cluster with restricted access (no root, module-based environment)

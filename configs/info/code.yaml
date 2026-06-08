@@ -17,7 +17,7 @@ project_structure: |
     import from each other.
   - cli/: thin adapter that parses arguments and delegates to
     modules. No business logic lives here.
-  - server/: another thin adapter exposing modules via MCP or API.
+  - server/: another thin adapter exposing modules via MCP.
     Mirrors the module structure (server/paper/, server/corpus/).
 
   This is essentially ports-and-adapters: domain at the center,
